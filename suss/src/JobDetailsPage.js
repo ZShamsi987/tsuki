@@ -43,7 +43,7 @@ export default function JobDetailsPage() {
           </Typography>
           {job.coursesWanted && (
             <Typography variant="body2" sx={{ mb: 1 }}>
-              Courses Wanted: {job.coursesWanted}
+              Courses Wanted: {job.coursesWanted.join(', ')}
             </Typography>
           )}
           {job.minGPA && (
@@ -65,6 +65,18 @@ export default function JobDetailsPage() {
             >
               Apply Now
             </Button>
+            {/* New: If AI interviewer is enabled and questions exist, show "Start Interview" button */}
+            {job.aiInterviewer && job.interviewQuestions && job.interviewQuestions.length > 0 && (
+              <Button
+                component={Link}
+                to={`/interview/${job._id}`}
+                variant="outlined"
+                size="small"
+                sx={{ mt: 1 }}
+              >
+                Start Interview
+              </Button>
+            )}
             <Button variant="outlined" size="small" onClick={() => navigate('/jobs')}>
               Back to Jobs
             </Button>

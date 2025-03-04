@@ -12,6 +12,7 @@ import MyApplicationsPage from './MyApplicationsPage';
 import LoginPage from './LoginPage';
 import SignupPage from './SignupPage';
 import JobDetailsPage from './JobDetailsPage';
+import InterviewPage from './InterviewPage'; // new import
 import { createTheme, ThemeProvider } from '@mui/material/styles';
 import { AuthProvider } from './FirebaseAuthContext';
 
@@ -84,6 +85,7 @@ export default function App() {
               <Route path="/job-details/:jobId" element={<JobDetailsPage />} />
               <Route path="/apply/:jobId" element={<ApplyPage />} />
               <Route path="/my-applications" element={<MyApplicationsPage />} />
+              <Route path="/interview/:jobId" element={<InterviewPage />} />
             </Routes>
           </Router>
         </ThemeProvider>

@@ -16,7 +16,7 @@ console.log('PORT =>', PORT);
 app.use(cors());
 app.use(express.json());
 
-// ===== Multer setup (for resumes) =====
+// Multer setup for resumes
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const dir = path.join(__dirname, '../uploads/resumes');
@@ -32,7 +32,7 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-// ===== Connect to Mongo =====
+// Connect to MongoDB
 mongoose
   .connect(process.env.MONGODB_URI, {
     useNewUrlParser: true,
@@ -41,7 +41,7 @@ mongoose
   .then(() => console.log('Connected to MongoDB'))
   .catch((err) => console.error('MongoDB connection error:', err));
 
-// ===== Models =====
+// Models
 const User = require('./user');
 
 const jobSchema = new mongoose.Schema({
@@ -55,6 +55,8 @@ const jobSchema = new mongoose.Schema({
   minGPA: String,
   intendedMajor: String,
   isApproved: { type: Boolean, default: false },
+  aiInterviewer: { type: Boolean, default: false },
+  interviewQuestions: { type: [String], default: [] },
   createdAt: { type: Date, default: Date.now },
 });
 const Job = mongoose.model('Job', jobSchema);
@@ -68,21 +70,15 @@ const applicationSchema = new mongoose.Schema({
   resume: String,
   resumeFilePath: String,
   appliedAt: Date,
+  interviewAnswers: { type: [String], default: [] },
 });
 const Application = mongoose.model('Application', applicationSchema);
 
-// ===== Routes =====
-
-// GET user by Firebase UID
+// Routes
 app.get('/users/uid/:uid', async (req, res) => {
   try {
-    console.log('GET /users/uid/:uid =>', req.params.uid);
     const user = await User.findOne({ firebaseUid: req.params.uid });
-    if (!user) {
-      console.log('No user doc found in Mongo for UID:', req.params.uid);
-      return res.status(404).json({ error: 'User not found' });
-    }
-    console.log('User doc found =>', user);
+    if (!user) return res.status(404).json({ error: 'User not found' });
     res.json(user);
   } catch (err) {
     console.error('Error fetching user:', err);
@@ -90,32 +86,23 @@ app.get('/users/uid/:uid', async (req, res) => {
   }
 });
 
-// POST/Update user data (signup or update)
 app.post('/users', async (req, res) => {
   try {
-    console.log('POST /users body =>', req.body);
     const { firebaseUid, email, role, gpa, courses, preferredRoles } = req.body;
-
     let user = await User.findOne({ firebaseUid });
-    if (!user) {
-      user = new User({ firebaseUid, email });
-    }
+    if (!user) user = new User({ firebaseUid, email });
     if (role) user.role = role;
     if (gpa) user.gpa = gpa;
     if (courses) user.courses = courses;
     if (preferredRoles) user.preferredRoles = preferredRoles;
-
-    console.log('Saving user =>', user);
     await user.save();
-    console.log('User saved successfully =>', user);
     return res.status(200).json(user);
   } catch (error) {
     console.error('Error saving user:', error);
-    return res.status(500).json({ error: error.message || 'Internal server error' });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-// GET all jobs
 app.get('/jobs', async (req, res) => {
   try {
     const jobs = await Job.find().sort({ createdAt: -1 });
@@ -126,7 +113,6 @@ app.get('/jobs', async (req, res) => {
   }
 });
 
-// POST a new job
 app.post('/jobs', async (req, res) => {
   try {
     const {
@@ -139,6 +125,7 @@ app.post('/jobs', async (req, res) => {
       rolesWanted,
       minGPA,
       intendedMajor,
+      aiInterviewer,
     } = req.body;
 
     const newJob = new Job({
@@ -151,8 +138,20 @@ app.post('/jobs', async (req, res) => {
       rolesWanted,
       minGPA,
       intendedMajor,
+      aiInterviewer,
     });
     await newJob.save();
+    console.log("New job created:", newJob);
+
+    if (aiInterviewer) {
+      console.log("AI Interviewer enabled. Generating interview questions...");
+      const { generateInterviewQuestions } = require('./aiInterview');
+      const questions = await generateInterviewQuestions(description);
+      newJob.interviewQuestions = questions;
+      await newJob.save();
+      console.log("Interview questions saved for job:", newJob._id);
+    }
+
     res.status(201).json(newJob);
   } catch (error) {
     console.error('Error saving job:', error);
@@ -160,17 +159,10 @@ app.post('/jobs', async (req, res) => {
   }
 });
 
-// Approve a job
 app.put('/jobs/:id/approve', async (req, res) => {
   try {
-    const job = await Job.findByIdAndUpdate(
-      req.params.id,
-      { isApproved: true },
-      { new: true }
-    );
-    if (!job) {
-      return res.status(404).json({ error: 'Job not found' });
-    }
+    const job = await Job.findByIdAndUpdate(req.params.id, { isApproved: true }, { new: true });
+    if (!job) return res.status(404).json({ error: 'Job not found' });
     res.json(job);
   } catch (error) {
     console.error(error);
@@ -178,13 +170,10 @@ app.put('/jobs/:id/approve', async (req, res) => {
   }
 });
 
-// DELETE a job
 app.delete('/jobs/:id', async (req, res) => {
   try {
     const job = await Job.findByIdAndDelete(req.params.id);
-    if (!job) {
-      return res.status(404).json({ error: 'Job not found' });
-    }
+    if (!job) return res.status(404).json({ error: 'Job not found' });
     res.json({ message: 'Job deleted successfully' });
   } catch (error) {
     console.error(error);
@@ -192,22 +181,11 @@ app.delete('/jobs/:id', async (req, res) => {
   }
 });
 
-// POST a new application
 app.post('/applications', upload.single('resumeFile'), async (req, res) => {
   try {
-    const {
-      jobId,
-      jobTitle,
-      userId,
-      userName,
-      email,
-      resume,
-    } = req.body;
-
+    const { jobId, jobTitle, userId, userName, email, resume } = req.body;
     let resumeFilePath = '';
-    if (req.file) {
-      resumeFilePath = '/uploads/resumes/' + req.file.filename;
-    }
+    if (req.file) resumeFilePath = '/uploads/resumes/' + req.file.filename;
 
     const newApp = new Application({
       jobId,
@@ -220,7 +198,6 @@ app.post('/applications', upload.single('resumeFile'), async (req, res) => {
       appliedAt: new Date(),
     });
     await newApp.save();
-
     return res.status(201).json(newApp);
   } catch (error) {
     console.error('Error submitting application:', error);
@@ -228,11 +205,12 @@ app.post('/applications', upload.single('resumeFile'), async (req, res) => {
   }
 });
 
-// GET applications
 app.get('/applications', async (req, res) => {
   try {
-    const { userId } = req.query;
-    const filter = userId ? { userId } : {};
+    const { userId, jobId } = req.query;
+    const filter = {};
+    if (userId) filter.userId = userId;
+    if (jobId) filter.jobId = jobId;
     const applications = await Application.find(filter).sort({ appliedAt: -1 });
     res.json(applications);
   } catch (error) {
@@ -241,7 +219,22 @@ app.get('/applications', async (req, res) => {
   }
 });
 
-// Start server
+app.put('/applications/update-interview', async (req, res) => {
+  try {
+    const { jobId, userId, answers } = req.body;
+    const application = await Application.findOneAndUpdate(
+      { jobId, userId },
+      { interviewAnswers: answers },
+      { new: true }
+    );
+    if (!application) return res.status(404).json({ error: 'Application not found' });
+    res.json(application);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });

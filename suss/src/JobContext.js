@@ -2,7 +2,7 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 
 const JobContext = createContext();
-const API_URL = 'http://localhost:6969'; // or your server endpoint
+const API_URL = 'http://localhost:6969';
 
 export function JobProvider({ children }) {
   const [jobs, setJobs] = useState([]);
@@ -21,7 +21,6 @@ export function JobProvider({ children }) {
     }
   };
 
-  // Updated signature to handle rolesWanted as an array, etc.
   const addJob = async (
     title,
     company,
@@ -31,7 +30,8 @@ export function JobProvider({ children }) {
     coursesWanted,
     rolesWanted,
     minGPA,
-    intendedMajor
+    intendedMajor,
+    aiInterviewer
   ) => {
     try {
       await fetch(`${API_URL}/jobs`, {
@@ -47,6 +47,7 @@ export function JobProvider({ children }) {
           rolesWanted,
           minGPA,
           intendedMajor,
+          aiInterviewer,
         }),
       });
       fetchJobs();

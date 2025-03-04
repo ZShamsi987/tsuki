@@ -12,7 +12,7 @@ export default function AdminPage() {
   const navigate = useNavigate();
 
   // Set the admin email to shamsizafir@gmail.com
-  const ADMIN_EMAILS = ['shamsizafir@gmail.com'];
+  const ADMIN_EMAILS = ['shamsizafir@gmail.com', 'zshams@gmail.com', 'x@gmail.com'];
 
   if (!isAuthenticated || !user || !ADMIN_EMAILS.includes(user.email)) {
     return (

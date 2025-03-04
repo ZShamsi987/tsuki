@@ -15,6 +15,7 @@ import {
   FormControl,
   FormControlLabel,
   FormLabel,
+  Switch
 } from '@mui/material';
 import { motion } from 'framer-motion';
 import { AddCircleOutline, RemoveCircleOutline } from '@mui/icons-material';
@@ -41,6 +42,9 @@ export default function SubmitPostingPage() {
 
   const [minGPA, setMinGPA] = useState('');
   const [intendedMajor, setIntendedMajor] = useState('');
+
+  // New toggle for AI Interviewer
+  const [aiInterviewer, setAiInterviewer] = useState(false);
 
   const handleAddCourse = () => {
     if (newCourse.trim()) {
@@ -83,7 +87,8 @@ export default function SubmitPostingPage() {
         coursesWanted,
         rolesWanted,
         minGPA,
-        intendedMajor
+        intendedMajor,
+        aiInterviewer  // Pass the new toggle value
       );
       alert('Job posting submitted!');
       navigate('/jobs');
@@ -107,11 +112,7 @@ export default function SubmitPostingPage() {
         transition={{ duration: 0.6 }}
       >
         <CardContent>
-          <Box
-            component="form"
-            onSubmit={handleSubmit}
-            sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}
-          >
+          <Box component="form" onSubmit={handleSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <Typography variant="h6" sx={{ fontWeight: 600 }}>
               Job Details
             </Typography>
@@ -142,11 +143,7 @@ export default function SubmitPostingPage() {
 
             <FormControl>
               <FormLabel>Compensation Type</FormLabel>
-              <RadioGroup
-                row
-                value={salaryType}
-                onChange={(e) => setSalaryType(e.target.value)}
-              >
+              <RadioGroup row value={salaryType} onChange={(e) => setSalaryType(e.target.value)}>
                 <FormControlLabel value="annual" control={<Radio />} label="Annual Salary" />
                 <FormControlLabel value="hourly" control={<Radio />} label="Hourly Wage" />
               </RadioGroup>
@@ -243,6 +240,17 @@ export default function SubmitPostingPage() {
               value={intendedMajor}
               onChange={(e) => setIntendedMajor(e.target.value)}
               fullWidth
+            />
+
+            {/* New toggle for AI Interviewer */}
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={aiInterviewer}
+                  onChange={(e) => setAiInterviewer(e.target.checked)}
+                />
+              }
+              label="Enable AI Interviewer"
             />
 
             <motion.div whileHover={{ scale: 1.02 }}>

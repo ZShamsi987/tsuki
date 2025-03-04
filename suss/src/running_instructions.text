@@ -1,4 +1,6 @@
-1. firebase emulators:start 
+-1. start ollama
+0. firebase emulators:start
+1. cd src, node deleteAllTestUsers.js 
 2. mongod --dbpath ~/data/db
 3. cd src, node server.js
 4. cd suss, npm start
