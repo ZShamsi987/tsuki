@@ -12,7 +12,8 @@ import MyApplicationsPage from './MyApplicationsPage';
 import LoginPage from './LoginPage';
 import SignupPage from './SignupPage';
 import JobDetailsPage from './JobDetailsPage';
-import InterviewPage from './InterviewPage'; // new import
+import InterviewPage from './InterviewPage';
+import AboutPage from './AboutPage';  // New About page import
 import { createTheme, ThemeProvider } from '@mui/material/styles';
 import { AuthProvider } from './FirebaseAuthContext';
 
@@ -77,6 +78,7 @@ export default function App() {
             <NavigationBar />
             <Routes>
               <Route path="/" element={<HomePage />} />
+              <Route path="/about" element={<AboutPage />} />  {/* About route */}
               <Route path="/login" element={<LoginPage />} />
               <Route path="/signup" element={<SignupPage />} />
               <Route path="/submit" element={<SubmitPostingPage />} />

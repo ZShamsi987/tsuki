@@ -8,7 +8,7 @@ const fetch = require('node-fetch');
  */
 function flattenDeep(arr) {
   return arr.reduce(
-    (acc, val) => Array.isArray(val) ? acc.concat(flattenDeep(val)) : acc.concat(val),
+    (acc, val) => (Array.isArray(val) ? acc.concat(flattenDeep(val)) : acc.concat(val)),
     []
   );
 }
@@ -66,7 +66,7 @@ function toQuestionString(item) {
 
 /**
  * Checks if a string is a valid interview question.
- * Rejects common labels or junk values.
+ * Rejects common labels, empty strings, or fallback default values.
  *
  * @param {string} str - The string to check.
  * @returns {boolean} True if valid, false otherwise.
@@ -74,6 +74,10 @@ function toQuestionString(item) {
 function isValidQuestion(str) {
   const lower = str.toLowerCase();
   if (lower === 'technical' || lower === 'non-technical' || lower === 'null' || lower === '') {
+    return false;
+  }
+  // Filter out fallback default questions like "Question1", "Question2", etc.
+  if (/^question\d+$/i.test(str)) {
     return false;
   }
   if (!isNaN(Number(str)) || str.length < 3) {
@@ -103,6 +107,9 @@ function extractQuestions(data) {
     }
     if ('value' in data) return data.value;
     if ('key' in data && 'text' in data) return [data.text];
+    // Try to extract any string values
+    const potential = Object.values(data).filter(val => typeof val === 'string');
+    if (potential.length > 0) return potential;
     return Object.values(data);
   }
   return [data];
@@ -116,7 +123,7 @@ function extractQuestions(data) {
  * @returns {Promise<string[]>} A promise that resolves with a flat array of 5 interview question strings.
  */
 async function generateInterviewQuestions(jobDescription) {
-  // Modified prompt to force a plain JSON array of exactly 5 strings.
+  // Prompt to force a plain JSON array of exactly 5 strings.
   const prompt = `Generate 5 interview questions (both technical and non-technical) based on the following job description: "${jobDescription}". 
 The output MUST be a JSON array of exactly 5 strings with no keys or extra formatting. For example: ["Question1", "Question2", "Question3", "Question4", "Question5"]. 
 Do not include any labels, keys, or additional text.`;

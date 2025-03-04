@@ -27,6 +27,10 @@ export default function NavigationBar() {
           Mavex
         </Typography>
         <div>
+          {/* Always show the About link */}
+          <Button component={Link} to="/about" sx={{ color: '#fff', mr: 2 }}>
+            About
+          </Button>
           {/* Admin => show everything */}
           {isAuthenticated && isAdmin && (
             <>
