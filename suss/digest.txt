@@ -7,6 +7,7 @@ Directory structure:
     │   ├── manifest.json
     │   └── robots.txt
     ├── src/
+    │   ├── AboutPage.js
     │   ├── AdminPage.js
     │   ├── App.css
     │   ├── App.js
@@ -258,6 +259,94 @@ Disallow:
 
 
 ================================================
+File: src/AboutPage.js
+================================================
+// src/AboutPage.js
+import React, { useState } from 'react';
+import { Container, Typography, Box, Tabs, Tab } from '@mui/material';
+
+function TabPanel(props) {
+  const { children, value, index, ...other } = props;
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`about-tabpanel-${index}`}
+      aria-labelledby={`about-tab-${index}`}
+      {...other}
+    >
+      {value === index && (
+        <Box sx={{ p: 3 }}>
+          {children}
+        </Box>
+      )}
+    </div>
+  );
+}
+
+function a11yProps(index) {
+  return {
+    id: `about-tab-${index}`,
+    'aria-controls': `about-tabpanel-${index}`,
+  };
+}
+
+export default function AboutPage() {
+  const [tabIndex, setTabIndex] = useState(0);
+
+  const handleChange = (event, newValue) => {
+    setTabIndex(newValue);
+  };
+
+  return (
+    <Container sx={{ py: 10 }}>
+      <Typography variant="h3" sx={{ fontWeight: 'bold', mb: 2 }}>
+        About Mavex
+      </Typography>
+      <Typography variant="body1" sx={{ mb: 4 }}>
+         A website for South Brunswick High School’s guidance department so students can easily search job postings and employers can easily submit them.
+      </Typography>
+      
+      <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+        <Tabs value={tabIndex} onChange={handleChange} aria-label="About tabs">
+          <Tab label="Students" {...a11yProps(0)} />
+          <Tab label="Employers" {...a11yProps(1)} />
+        </Tabs>
+      </Box>
+      <TabPanel value={tabIndex} index={0}>
+        <Typography variant="h5" sx={{ fontWeight: 'bold', mb: 1 }}>
+          For Students
+        </Typography>
+        <Typography variant="body1" sx={{ mb: 2 }}>
+          On the Sign Up page, you can add multiple courses by typing the course name and clicking the <strong>add button</strong>. Fields marked with an asterisk (<strong>*</strong>) are required. Similarly, you can add your preferred roles.
+        </Typography>
+        <Typography variant="body1" sx={{ mb: 2 }}>
+          When applying for a job, you can upload your resume as a file (PDF, DOC, etc.) or type your additional experience/cover letter into the provided text area.
+        </Typography>
+        <Typography variant="body1">
+          On the Jobs page, you can filter postings by location, salary range, and “My Matches” – which uses your GPA, courses, and preferred roles to show the best fit. If an employer has enabled the AI Interviewer, you’ll be taken through a 10‑minute interview session that locks you into the page.
+        </Typography>
+      </TabPanel>
+      <TabPanel value={tabIndex} index={1}>
+        <Typography variant="h5" sx={{ fontWeight: 'bold', mb: 1 }}>
+          For Employers
+        </Typography>
+        <Typography variant="body1" sx={{ mb: 2 }}>
+          On the Submit Posting page, you can create a new job posting by filling in required fields such as Job Title, Company, Location, Salary (annual or hourly), and Description. You can add multiple roles and courses by typing a value and clicking the <strong>add button</strong>.
+        </Typography>
+        <Typography variant="body1" sx={{ mb: 2 }}>
+          If you enable the AI Interviewer toggle, the system will automatically generate interview questions based on your job description. These questions are then used when a student applies and takes an AI interview.
+        </Typography>
+        <Typography variant="body1">
+          Additionally, the admin dashboard allows an administrator to approve or delete job postings, ensuring that only quality jobs are visible to students.
+        </Typography>
+      </TabPanel>
+    </Container>
+  );
+}
+
+
+================================================
 File: src/AdminPage.js
 ================================================
 // src/AdminPage.js
@@ -417,7 +506,8 @@ import MyApplicationsPage from './MyApplicationsPage';
 import LoginPage from './LoginPage';
 import SignupPage from './SignupPage';
 import JobDetailsPage from './JobDetailsPage';
-import InterviewPage from './InterviewPage'; // new import
+import InterviewPage from './InterviewPage';
+import AboutPage from './AboutPage';  // New About page import
 import { createTheme, ThemeProvider } from '@mui/material/styles';
 import { AuthProvider } from './FirebaseAuthContext';
 
@@ -482,6 +572,7 @@ export default function App() {
             <NavigationBar />
             <Routes>
               <Route path="/" element={<HomePage />} />
+              <Route path="/about" element={<AboutPage />} />  {/* About route */}
               <Route path="/login" element={<LoginPage />} />
               <Route path="/signup" element={<SignupPage />} />
               <Route path="/submit" element={<SubmitPostingPage />} />
@@ -517,9 +608,17 @@ test('renders learn react link', () => {
 File: src/ApplyPage.js
 ================================================
 // src/ApplyPage.js
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Container, Typography, Card, CardContent, TextField, Button, Box } from '@mui/material';
+import {
+  Container,
+  Typography,
+  Card,
+  CardContent,
+  TextField,
+  Button,
+  Box,
+} from '@mui/material';
 import { useJobs } from './JobContext';
 import { useAuth } from './FirebaseAuthContext';
 
@@ -535,27 +634,238 @@ export default function ApplyPage() {
   const [studentName, setStudentName] = useState(user?.displayName || '');
   const [email, setEmail] = useState(user?.email || '');
   const [resumeText, setResumeText] = useState('');
-  const [resumeFile, setResumeFile] = useState(null); // file upload
+  const [resumeFile, setResumeFile] = useState(null);
 
-  if (!job) {
-    return (
-      <Container sx={{ py: 10 }}>
-        <Typography>Job not found or not approved.</Typography>
-        <Button variant="outlined" sx={{ mt: 3 }} onClick={() => navigate('/jobs')}>
-          Back to Jobs
-        </Button>
-      </Container>
-    );
-  }
+  // Interview mode states
+  const [interviewMode, setInterviewMode] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(600); // 10 minutes in seconds
+  const [answers, setAnswers] = useState({});
+  const [tabSwitched, setTabSwitched] = useState(false);
 
-  if (!isAuthenticated) {
-    navigate('/signup');
-    return null;
-  }
-
+  // Define handleFileChange so it's available in renderContent.
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files.length > 0) {
       setResumeFile(e.target.files[0]);
+    }
+  };
+
+  // Helper function for conditional rendering without breaking hooks rules
+  const renderContent = () => {
+    if (!job) {
+      return (
+        <Container sx={{ py: 10 }}>
+          <Typography>Job not found or not approved.</Typography>
+          <Button
+            variant="outlined"
+            sx={{ mt: 3 }}
+            onClick={() => navigate('/jobs')}
+          >
+            Back to Jobs
+          </Button>
+        </Container>
+      );
+    }
+    if (!isAuthenticated) {
+      return (
+        <Container sx={{ py: 10 }}>
+          <Typography>You must be logged in to apply.</Typography>
+          <Button
+            variant="outlined"
+            sx={{ mt: 3 }}
+            onClick={() => navigate('/signup')}
+          >
+            Sign Up
+          </Button>
+        </Container>
+      );
+    }
+    if (interviewMode) {
+      if (!job.aiInterviewer || !job.interviewQuestions || job.interviewQuestions.length === 0) {
+        return (
+          <Container sx={{ py: 10 }}>
+            <Typography variant="h5">
+              No AI interview available for this job.
+            </Typography>
+          </Container>
+        );
+      }
+      if (tabSwitched) {
+        return (
+          <Container sx={{ py: 10 }}>
+            <Typography variant="h4">Interview Terminated</Typography>
+            <Typography>
+              The interview was terminated due to tab switching.
+            </Typography>
+          </Container>
+        );
+      }
+      if (!acceptedTerms) {
+        return (
+          <Container sx={{ py: 10 }}>
+            <Typography variant="h4" gutterBottom>
+              Interview Terms
+            </Typography>
+            <Typography sx={{ mb: 2 }}>
+              By starting the interview, you agree not to seek external help.
+              You have 10 minutes to complete it. Switching tabs will terminate
+              the interview.
+            </Typography>
+            <Button
+              variant="contained"
+              onClick={() => setAcceptedTerms(true)}
+            >
+              Accept and Start Interview
+            </Button>
+          </Container>
+        );
+      }
+      return (
+        <Container sx={{ py: 10 }}>
+          <Typography variant="h4" gutterBottom>
+            Interview for {job.title}
+          </Typography>
+          <Typography variant="h6" sx={{ mb: 2 }}>
+            Time Left: {Math.floor(timeLeft / 60)}:
+            {(timeLeft % 60).toString().padStart(2, '0')}
+          </Typography>
+          {job.interviewQuestions.map((question, index) => (
+            <Box key={index} sx={{ mb: 3 }}>
+              <Typography variant="subtitle1">
+                {index + 1}. {question}
+              </Typography>
+              <TextField
+                fullWidth
+                multiline
+                rows={3}
+                variant="outlined"
+                value={answers[index] || ''}
+                onChange={(e) => handleAnswerChange(index, e.target.value)}
+                placeholder="Type your answer here..."
+              />
+            </Box>
+          ))}
+          <Button
+            variant="contained"
+            onClick={handleInterviewSubmit}
+            disabled={timeLeft === 0}
+          >
+            Submit Interview
+          </Button>
+        </Container>
+      );
+    }
+    // Default: render the application form
+    return (
+      <Container maxWidth="sm" sx={{ py: 10 }}>
+        <Typography variant="h5" gutterBottom sx={{ fontWeight: 600 }}>
+          Apply for {job.title}
+        </Typography>
+        <Card sx={{ mt: 3, borderRadius: 2 }} elevation={3}>
+          <CardContent sx={{ p: 3 }}>
+            <Box
+              component="form"
+              onSubmit={handleApply}
+              sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}
+            >
+              <TextField
+                label="Your Name"
+                variant="outlined"
+                value={studentName}
+                onChange={(e) => setStudentName(e.target.value)}
+              />
+              <TextField
+                label="Your Email"
+                variant="outlined"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+              <TextField
+                label="Additional Experience / Cover Letter"
+                variant="outlined"
+                multiline
+                rows={4}
+                value={resumeText}
+                onChange={(e) => setResumeText(e.target.value)}
+              />
+              <Typography variant="body2" sx={{ mt: 1 }}>
+                Upload Resume (PDF, DOC, etc.)
+              </Typography>
+              <Button variant="outlined" component="label">
+                Choose File
+                <input type="file" hidden onChange={handleFileChange} />
+              </Button>
+              {resumeFile && (
+                <Typography>Selected File: {resumeFile.name}</Typography>
+              )}
+              <Button variant="contained" type="submit" sx={{ mt: 2 }}>
+                Submit Application
+              </Button>
+            </Box>
+          </CardContent>
+        </Card>
+      </Container>
+    );
+  };
+
+  // Always call hooks unconditionally
+
+  // Interview timer effect
+  useEffect(() => {
+    if (interviewMode && acceptedTerms && timeLeft > 0 && !tabSwitched) {
+      const timer = setInterval(() => {
+        setTimeLeft((prev) => {
+          if (prev <= 1) {
+            handleInterviewSubmit();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      return () => clearInterval(timer);
+    }
+  }, [interviewMode, acceptedTerms, timeLeft, tabSwitched]);
+
+  // Tab switch detection effect
+  useEffect(() => {
+    if (interviewMode && acceptedTerms) {
+      const handleVisibilityChange = () => {
+        if (document.hidden) {
+          setTabSwitched(true);
+          alert('Tab switch detected. Interview terminated.');
+          handleInterviewSubmit();
+        }
+      };
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      return () =>
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+    }
+  }, [interviewMode, acceptedTerms]);
+
+  const handleAnswerChange = (index, value) => {
+    setAnswers((prev) => ({ ...prev, [index]: value }));
+  };
+
+  const handleInterviewSubmit = async () => {
+    try {
+      const response = await fetch(`${API_URL}/applications/update-interview`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jobId,
+          userId: user.uid,
+          answers: Object.values(answers),
+        }),
+      });
+      if (response.ok) {
+        alert('Interview submitted successfully!');
+        navigate('/my-applications');
+      } else {
+        alert('Error submitting interview.');
+      }
+    } catch (error) {
+      console.error('Error submitting interview:', error);
+      alert('Error submitting interview.');
     }
   };
 
@@ -580,7 +890,12 @@ export default function ApplyPage() {
         });
 
         alert(`Application submitted for ${job.title}!`);
-        navigate('/jobs');
+
+        if (job.aiInterviewer) {
+          setInterviewMode(true);
+        } else {
+          navigate('/jobs');
+        }
       } catch (error) {
         console.error('Error submitting application: ', error);
         alert('Error submitting application.');
@@ -590,51 +905,7 @@ export default function ApplyPage() {
     }
   };
 
-  return (
-    <Container maxWidth="sm" sx={{ py: 10 }}>
-      <Typography variant="h5" gutterBottom sx={{ fontWeight: 600 }}>
-        Apply for {job.title}
-      </Typography>
-      <Card sx={{ mt: 3, borderRadius: 2 }} elevation={3}>
-        <CardContent sx={{ p: 3 }}>
-          <Box component="form" onSubmit={handleApply} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <TextField
-              label="Your Name"
-              variant="outlined"
-              value={studentName}
-              onChange={(e) => setStudentName(e.target.value)}
-            />
-            <TextField
-              label="Your Email"
-              variant="outlined"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-            <TextField
-              label="Additional Experience / Cover Letter"
-              variant="outlined"
-              multiline
-              rows={4}
-              value={resumeText}
-              onChange={(e) => setResumeText(e.target.value)}
-            />
-            <Typography variant="body2" sx={{ mt: 1 }}>
-              Upload Resume (PDF, DOC, etc.)
-            </Typography>
-            <Button variant="outlined" component="label">
-              Choose File
-              <input type="file" hidden onChange={handleFileChange} />
-            </Button>
-            {resumeFile && <Typography>Selected File: {resumeFile.name}</Typography>}
-
-            <Button variant="contained" type="submit" sx={{ mt: 2 }}>
-              Submit Application
-            </Button>
-          </Box>
-        </CardContent>
-      </Card>
-    </Container>
-  );
+  return renderContent();
 }
 
 
@@ -1788,6 +2059,10 @@ export default function NavigationBar() {
           Mavex
         </Typography>
         <div>
+          {/* Always show the About link */}
+          <Button component={Link} to="/about" sx={{ color: '#fff', mr: 2 }}>
+            About
+          </Button>
           {/* Admin => show everything */}
           {isAuthenticated && isAdmin && (
             <>
@@ -2396,7 +2671,7 @@ const fetch = require('node-fetch');
  */
 function flattenDeep(arr) {
   return arr.reduce(
-    (acc, val) => Array.isArray(val) ? acc.concat(flattenDeep(val)) : acc.concat(val),
+    (acc, val) => (Array.isArray(val) ? acc.concat(flattenDeep(val)) : acc.concat(val)),
     []
   );
 }
@@ -2454,7 +2729,7 @@ function toQuestionString(item) {
 
 /**
  * Checks if a string is a valid interview question.
- * Rejects common labels or junk values.
+ * Rejects common labels, empty strings, or fallback default values.
  *
  * @param {string} str - The string to check.
  * @returns {boolean} True if valid, false otherwise.
@@ -2462,6 +2737,10 @@ function toQuestionString(item) {
 function isValidQuestion(str) {
   const lower = str.toLowerCase();
   if (lower === 'technical' || lower === 'non-technical' || lower === 'null' || lower === '') {
+    return false;
+  }
+  // Filter out fallback default questions like "Question1", "Question2", etc.
+  if (/^question\d+$/i.test(str)) {
     return false;
   }
   if (!isNaN(Number(str)) || str.length < 3) {
@@ -2491,6 +2770,9 @@ function extractQuestions(data) {
     }
     if ('value' in data) return data.value;
     if ('key' in data && 'text' in data) return [data.text];
+    // Try to extract any string values
+    const potential = Object.values(data).filter(val => typeof val === 'string');
+    if (potential.length > 0) return potential;
     return Object.values(data);
   }
   return [data];
@@ -2504,7 +2786,7 @@ function extractQuestions(data) {
  * @returns {Promise<string[]>} A promise that resolves with a flat array of 5 interview question strings.
  */
 async function generateInterviewQuestions(jobDescription) {
-  // Modified prompt to force a plain JSON array of exactly 5 strings.
+  // Prompt to force a plain JSON array of exactly 5 strings.
   const prompt = `Generate 5 interview questions (both technical and non-technical) based on the following job description: "${jobDescription}". 
 The output MUST be a JSON array of exactly 5 strings with no keys or extra formatting. For example: ["Question1", "Question2", "Question3", "Question4", "Question5"]. 
 Do not include any labels, keys, or additional text.`;
